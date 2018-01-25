@@ -1002,7 +1002,9 @@ public partial class PostgresAdapter : ISqlAdapter
     /// <param name="columnName">The column name.</param>
     public void AppendColumnNameEqualsValue(StringBuilder sb, string columnName)
     {
-        sb.AppendFormat("\"{0}\" = @{1}", columnName, columnName);
+        // DAVE: remove double quotes to prevent clash with postgres automatic lowercasing of column names.
+        //sb.AppendFormat("\"{0}\" = @{1}", columnName, columnName);
+        sb.AppendFormat("{0} = @{1}", columnName, columnName);
     }
 }
 
