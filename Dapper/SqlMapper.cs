@@ -549,7 +549,7 @@ namespace Dapper
                                 cmd.Parameters.Clear(); // current code is Add-tastic
                             }
                             info.ParamReader(cmd, obj);
-                            total += cmd.ExecuteNonQuery();
+                            PerfLog.Do(cmd.CommandText, () => total += cmd.ExecuteNonQuery());
                         }
                     }
                     command.OnCompleted();
@@ -1050,14 +1050,19 @@ namespace Dapper
         {
             try
             {
-                return cmd.ExecuteReader(GetBehavior(wasClosed, behavior));
+                IDataReader result = null;
+                PerfLog.Do(cmd.CommandText, () => result = cmd.ExecuteReader(GetBehavior(wasClosed, behavior)));
+                return result;
             }
             catch (ArgumentException ex)
             { // thanks, Sqlite!
                 if (Settings.DisableCommandBehaviorOptimizations(behavior, ex))
                 {
                     // we can retry; this time it will have different flags
-                    return cmd.ExecuteReader(GetBehavior(wasClosed, behavior));
+                    IDataReader result = null;
+                    PerfLog.Do(cmd.CommandText, () => result = cmd.ExecuteReader(GetBehavior(wasClosed, behavior)));
+                    return result;
+
                 }
                 throw;
             }
@@ -2824,7 +2829,8 @@ namespace Dapper
             {
                 cmd = command.SetupCommand(cnn, paramReader);
                 if (wasClosed) cnn.Open();
-                int result = cmd.ExecuteNonQuery();
+                int result = 0;
+                PerfLog.Do(cmd.CommandText, () => result = cmd.ExecuteNonQuery());
                 command.OnCompleted();
                 return result;
             }
@@ -2847,12 +2853,12 @@ namespace Dapper
 
             IDbCommand cmd = null;
             bool wasClosed = cnn.State == ConnectionState.Closed;
-            object result;
+            object result = null;
             try
             {
                 cmd = command.SetupCommand(cnn, paramReader);
                 if (wasClosed) cnn.Open();
-                result = cmd.ExecuteScalar();
+                PerfLog.Do(cmd.CommandText, () => result = cmd.ExecuteScalar());
                 command.OnCompleted();
             }
             finally
