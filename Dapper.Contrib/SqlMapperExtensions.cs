@@ -429,6 +429,88 @@ namespace Dapper.Contrib.Extensions
         }
 
         /// <summary>
+        /// Returns the update query generated to update the given entity. It uses parameters in the query. 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="connection"></param>
+        /// <param name="entityToUpdate"></param>
+        /// <param name="onlyProperties">Optional, a list of properties to explicitly set. Properties not contained here will not be included in the update statement. If set to null, all properties will be included.</param>
+        /// <returns></returns>
+        public static string GetUpdateStatement<T>(this IDbConnection connection, T entityToUpdate, string[] onlyProperties = null)
+        {
+            if (entityToUpdate is IProxy proxy && !proxy.IsDirty)
+            {
+                return null;
+            }
+
+            var type = typeof(T);
+
+            if (type.IsArray)
+            {
+                type = type.GetElementType();
+            }
+            else if (type.IsGenericType())
+            {
+                type = type.GetGenericArguments()[0];
+            }
+
+            var keyProperties = KeyPropertiesCache(type).ToList();  //added ToList() due to issue #418, must work on a list copy
+            var explicitKeyProperties = ExplicitKeyPropertiesCache(type);
+            if (keyProperties.Count == 0 && explicitKeyProperties.Count == 0)
+                throw new ArgumentException("Entity must have at least one [Key] or [ExplicitKey] property");
+
+            var name = GetTableName(type);
+
+            var sb = new StringBuilder();
+            sb.AppendFormat("update {0} set ", name);
+
+            var allProperties = TypePropertiesCache(type);
+            keyProperties.AddRange(explicitKeyProperties);
+            var computedProperties = ComputedPropertiesCache(type);
+            var nonIdProps = allProperties.Except(keyProperties.Union(computedProperties)).ToList();
+            if (onlyProperties != null) nonIdProps = nonIdProps.Where(prop => onlyProperties.Contains(prop.Name)).ToList();
+
+            var adapter = GetFormatter(connection);
+
+            for (var i = 0; i < nonIdProps.Count; i++)
+            {
+                var property = nonIdProps[i];
+                adapter.AppendColumnNameEqualsValue(sb, property.Name);  //fix for issue #336
+                if (i < nonIdProps.Count - 1)
+                    sb.AppendFormat(", ");
+            }
+            sb.Append(" where ");
+            for (var i = 0; i < keyProperties.Count; i++)
+            {
+                var property = keyProperties[i];
+                adapter.AppendColumnNameEqualsValue(sb, property.Name);  //fix for issue #336
+                if (i < keyProperties.Count - 1)
+                    sb.AppendFormat(" and ");
+            }
+
+            return sb.ToString();
+        }
+
+
+
+        /// <summary>
+        /// Updates entity in table "Ts", checks if the entity is modified if the entity is tracked by the Get() extension.
+        /// </summary>
+        /// <typeparam name="T">Type to be updated</typeparam>
+        /// <param name="connection">Open SqlConnection</param>
+        /// <param name="entityToUpdate">Entity to be updated</param>
+        /// <param name="transaction">The transaction to run under, null (the default) if none</param>
+        /// <param name="onlyProperties">Generate update "set" entries for these properties</param>
+        /// <param name="commandTimeout">Number of seconds before command execution timeout</param>
+        /// <returns>true if updated, false if not found or not modified (tracked entities)</returns>
+        public static bool UpdateExplicitProperties<T>(this IDbConnection connection, T entityToUpdate, string[] onlyProperties, IDbTransaction transaction = null, int? commandTimeout = null) where T : class
+        {
+            var query = GetUpdateStatement(connection, entityToUpdate, onlyProperties);
+            var updated = connection.Execute(query, entityToUpdate, commandTimeout: commandTimeout, transaction: transaction);
+            return updated > 0;
+        }
+
+        /// <summary>
         /// Delete entity in table "Ts".
         /// </summary>
         /// <typeparam name="T">Type of entity</typeparam>
