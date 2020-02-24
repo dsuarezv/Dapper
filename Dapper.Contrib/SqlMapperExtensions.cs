@@ -730,7 +730,7 @@ namespace Dapper.Contrib.Extensions
     /// Specifies this is a JSON column type
     /// </summary>
     [AttributeUsage(AttributeTargets.Property)]
-    public class JsonFieldAttribute : Attribute 
+    public class DbJsonAttribute : Attribute 
     {     
     }
 
@@ -1072,9 +1072,7 @@ public partial class PostgresAdapter : ISqlAdapter
 
     private string GetParameterName(PropertyInfo property)
     {
-        var isJson = property.GetCustomAttribute(typeof(Dapper.Contrib.Extensions.JsonFieldAttribute)) != null;
-
-        if (isJson) System.Diagnostics.Debugger.Break();
+        var isJson = property.GetCustomAttribute(typeof(Dapper.Contrib.Extensions.DbJsonAttribute)) != null;
 
         return string.Format(isJson ? "CAST(@{0} AS json)" : "@{0}", property.Name);
     }
