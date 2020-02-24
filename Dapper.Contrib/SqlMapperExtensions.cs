@@ -341,7 +341,7 @@ namespace Dapper.Contrib.Extensions
             for (var i = 0; i < allPropertiesExceptKeyAndComputed.Count; i++)
             {
                 var property = allPropertiesExceptKeyAndComputed[i];
-                sbParameterList.AppendFormat("@{0}", property.Name);
+                adapter.AppendParameterName(sbParameterList, property);
                 if (i < allPropertiesExceptKeyAndComputed.Count - 1)
                     sbParameterList.Append(", ");
             }
@@ -725,6 +725,15 @@ namespace Dapper.Contrib.Extensions
     public class ComputedAttribute : Attribute
     {
     }
+
+    /// <summary>
+    /// Specifies this is a JSON column type
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Property)]
+    public class JsonFieldAttribute : Attribute 
+    {     
+    }
+
 }
 
 /// <summary>
@@ -753,6 +762,15 @@ public partial interface ISqlAdapter
     /// <param name="sb">The string builder  to append to.</param>
     /// <param name="columnName">The column name.</param>
     void AppendColumnName(StringBuilder sb, string columnName);
+
+    /// <summary>
+    /// Adds the parameter name for a column. Should match the name of the property to properly get the value 
+    /// from the model object. Implementor can add other things like casts that surround the property name.
+    /// </summary>
+    /// <param name="sb">The string builder  to append to.</param>
+    /// <param name="property">The porperty info, can be used to get the Name and any attributes</param>
+    void AppendParameterName(StringBuilder sb, PropertyInfo property);
+
     /// <summary>
     /// Adds a column equality to a parameter.
     /// </summary>
@@ -804,6 +822,17 @@ public partial class SqlServerAdapter : ISqlAdapter
     public void AppendColumnName(StringBuilder sb, string columnName)
     {
         sb.AppendFormat("[{0}]", columnName);
+    }
+
+    /// <summary>
+    /// Adds the parameter name for a column. Should match the name of the property to properly get the value 
+    /// from the model object. Implementor can add other things like casts that surround the property name.
+    /// </summary>
+    /// <param name="sb">The string builder  to append to.</param>
+    /// <param name="property">The porperty info, can be used to get the Name and any attributes</param>
+    public void AppendParameterName(StringBuilder sb, PropertyInfo property)
+    {
+        sb.AppendFormat("@{0}", property.Name);
     }
 
     /// <summary>
@@ -863,6 +892,17 @@ public partial class SqlCeServerAdapter : ISqlAdapter
     }
 
     /// <summary>
+    /// Adds the parameter name for a column. Should match the name of the property to properly get the value 
+    /// from the model object. Implementor can add other things like casts that surround the property name.
+    /// </summary>
+    /// <param name="sb">The string builder  to append to.</param>
+    /// <param name="property">The porperty info, can be used to get the Name and any attributes</param>
+    public void AppendParameterName(StringBuilder sb, PropertyInfo property)
+    {
+        sb.AppendFormat("@{0}", property.Name);
+    }
+
+    /// <summary>
     /// Adds a column equality to a parameter.
     /// </summary>
     /// <param name="sb">The string builder  to append to.</param>
@@ -915,6 +955,17 @@ public partial class MySqlAdapter : ISqlAdapter
     public void AppendColumnName(StringBuilder sb, string columnName)
     {
         sb.AppendFormat("`{0}`", columnName);
+    }
+
+    /// <summary>
+    /// Adds the parameter name for a column. Should match the name of the property to properly get the value 
+    /// from the model object. Implementor can add other things like casts that surround the property name.
+    /// </summary>
+    /// <param name="sb">The string builder  to append to.</param>
+    /// <param name="property">The porperty info, can be used to get the Name and any attributes</param>
+    public void AppendParameterName(StringBuilder sb, PropertyInfo property)
+    {
+        sb.AppendFormat("@{0}", property.Name);
     }
 
     /// <summary>
@@ -996,6 +1047,17 @@ public partial class PostgresAdapter : ISqlAdapter
     }
 
     /// <summary>
+    /// Adds the parameter name for a column. Should match the name of the property to properly get the value 
+    /// from the model object. Implementor can add other things like casts that surround the property name.
+    /// </summary>
+    /// <param name="sb">The string builder  to append to.</param>
+    /// <param name="property">The property info to be added as parameter. Can be used to get the Name and any attributes</param>
+    public void AppendParameterName(StringBuilder sb, PropertyInfo property)
+    {
+        sb.Append(GetParameterName(property));
+    }
+
+    /// <summary>
     /// Adds a column equality to a parameter.
     /// </summary>
     /// <param name="sb">The string builder  to append to.</param>
@@ -1005,6 +1067,16 @@ public partial class PostgresAdapter : ISqlAdapter
         // DAVE: remove double quotes to prevent clash with postgres automatic lowercasing of column names.
         //sb.AppendFormat("\"{0}\" = @{1}", columnName, columnName);
         sb.AppendFormat("{0} = @{1}", columnName, columnName);
+    }
+
+
+    private string GetParameterName(PropertyInfo property)
+    {
+        var isJson = property.GetCustomAttribute(typeof(Dapper.Contrib.Extensions.JsonFieldAttribute)) != null;
+
+        if (isJson) System.Diagnostics.Debugger.Break();
+
+        return string.Format(isJson ? "CAST(@{0} AS json)" : "@{0}", property.Name);
     }
 }
 
@@ -1048,6 +1120,17 @@ public partial class SQLiteAdapter : ISqlAdapter
     public void AppendColumnName(StringBuilder sb, string columnName)
     {
         sb.AppendFormat("\"{0}\"", columnName);
+    }
+
+    /// <summary>
+    /// Adds the parameter name for a column. Should match the name of the property to properly get the value 
+    /// from the model object. Implementor can add other things like casts that surround the property name.
+    /// </summary>
+    /// <param name="sb">The string builder  to append to.</param>
+    /// <param name="property">The porperty info, can be used to get the Name and any attributes</param>
+    public void AppendParameterName(StringBuilder sb, PropertyInfo property)
+    {
+        sb.AppendFormat("@{0}", property.Name);
     }
 
     /// <summary>
@@ -1105,6 +1188,17 @@ public partial class FbAdapter : ISqlAdapter
     public void AppendColumnName(StringBuilder sb, string columnName)
     {
         sb.AppendFormat("{0}", columnName);
+    }
+
+    /// <summary>
+    /// Adds the parameter name for a column. Should match the name of the property to properly get the value 
+    /// from the model object. Implementor can add other things like casts that surround the property name.
+    /// </summary>
+    /// <param name="sb">The string builder  to append to.</param>
+    /// <param name="property">The porperty info, can be used to get the Name and any attributes</param>
+    public void AppendParameterName(StringBuilder sb, PropertyInfo property)
+    {
+        sb.AppendFormat("@{0}", property.Name);
     }
 
     /// <summary>
